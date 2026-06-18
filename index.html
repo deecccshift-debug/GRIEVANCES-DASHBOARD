@@ -1,0 +1,846 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Grievance Analytics Dashboard</title>
+<link rel="stylesheet" href="https://unpkg.com/@tabler/icons-webfont@2.47.0/tabler-icons.min.css"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  :root{
+    --bg:#0f1117;--bg2:#1a1d27;--bg3:#22263a;--bg4:#2a2f45;
+    --accent:#4f8ef7;--accent2:#7c5cfc;--accent3:#22d3a5;--accent4:#f7a14f;--accent5:#f75f5f;
+    --text:#e8eaf0;--text2:#9aa3bf;--text3:#5a6380;
+    --border:#2e3350;--border2:#3d4570;
+    --green:#22d3a5;--red:#f75f5f;--yellow:#f7c34f;--purple:#7c5cfc;--blue:#4f8ef7;
+    --radius:10px;--radius-sm:6px;
+  }
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:var(--bg);color:var(--text);min-height:100vh;font-size:13px}
+  
+  /* TOP NAV */
+  .topbar{background:var(--bg2);border-bottom:1px solid var(--border);padding:0 20px;display:flex;align-items:center;justify-content:space-between;height:52px;position:sticky;top:0;z-index:100}
+  .topbar-left{display:flex;align-items:center;gap:10px}
+  .topbar-brand{font-size:14px;font-weight:600;color:var(--text);letter-spacing:.3px}
+  .topbar-badge{background:var(--accent);color:#fff;font-size:10px;padding:2px 8px;border-radius:20px;font-weight:600}
+  .topbar-right{display:flex;align-items:center;gap:12px}
+  .upload-btn{background:var(--accent);color:#fff;border:none;padding:7px 16px;border-radius:var(--radius-sm);font-size:12px;font-weight:600;cursor:pointer;display:flex;align-items:center;gap:6px;transition:opacity .2s}
+  .upload-btn:hover{opacity:.85}
+  .last-updated{font-size:11px;color:var(--text3)}
+  
+  /* LAYOUT */
+  .main{padding:16px 20px;display:flex;flex-direction:column;gap:14px}
+  
+  /* SLICERS PANEL */
+  .slicers-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+  .slicers-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .slicers-title{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase}
+  .clear-filters-btn{font-size:11px;color:var(--accent);background:none;border:none;cursor:pointer;display:flex;align-items:center;gap:4px}
+  .clear-filters-btn:hover{text-decoration:underline}
+  .slicers-row{display:flex;flex-wrap:wrap;gap:10px}
+  .slicer-group{display:flex;flex-direction:column;gap:4px;flex:1;min-width:130px}
+  .slicer-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.8px;text-transform:uppercase}
+  .slicer-select{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:5px 10px;font-size:12px;cursor:pointer;appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%239aa3bf' stroke-width='2'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 8px center}
+  .slicer-select:focus{outline:none;border-color:var(--accent)}
+  
+  /* TIMELINE */
+  .timeline-panel{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:12px 16px}
+  .timeline-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+  .timeline-title{font-size:11px;font-weight:700;color:var(--text2);letter-spacing:1px;text-transform:uppercase}
+  .timeline-controls{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+  .timeline-btn{padding:4px 12px;border:1px solid var(--border2);border-radius:20px;background:transparent;color:var(--text2);font-size:11px;cursor:pointer;transition:all .2s}
+  .timeline-btn.active,.timeline-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+  .date-range{display:flex;align-items:center;gap:8px}
+  .date-input{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:4px 10px;font-size:12px}
+  .date-input:focus{outline:none;border-color:var(--accent)}
+  
+  /* KPI GRID */
+  .kpi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px}
+  .kpi-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px 16px;position:relative;overflow:hidden;transition:border-color .2s}
+  .kpi-card:hover{border-color:var(--border2)}
+  .kpi-card::before{content:'';position:absolute;top:0;left:0;width:3px;height:100%;background:var(--kpi-color)}
+  .kpi-icon{width:32px;height:32px;border-radius:8px;display:flex;align-items:center;justify-content:center;font-size:16px;margin-bottom:10px;background:color-mix(in srgb,var(--kpi-color) 15%,transparent)}
+  .kpi-icon i{color:var(--kpi-color)}
+  .kpi-label{font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:4px}
+  .kpi-value{font-size:26px;font-weight:700;color:var(--text);line-height:1}
+  .kpi-sub{font-size:11px;color:var(--text2);margin-top:5px}
+  .kpi-trend{display:flex;align-items:center;gap:4px;font-size:11px;margin-top:4px}
+  .trend-up{color:var(--red)}
+  .trend-down{color:var(--green)}
+  
+  /* CHARTS GRID */
+  .charts-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(340px,1fr));gap:14px}
+  .chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .chart-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:4px}
+  .chart-subtitle{font-size:11px;color:var(--text3);margin-bottom:14px}
+  .chart-container{position:relative}
+  
+  /* TABLE */
+  .table-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:16px}
+  .table-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+  .table-title{font-size:13px;font-weight:600;color:var(--text)}
+  .table-search{background:var(--bg3);border:1px solid var(--border);color:var(--text);border-radius:var(--radius-sm);padding:5px 12px;font-size:12px;width:220px}
+  .table-search:focus{outline:none;border-color:var(--accent)}
+  .data-table{width:100%;border-collapse:collapse;font-size:12px}
+  .data-table th{text-align:left;padding:8px 10px;font-size:10px;font-weight:700;color:var(--text3);letter-spacing:.7px;text-transform:uppercase;border-bottom:1px solid var(--border);cursor:pointer;user-select:none}
+  .data-table th:hover{color:var(--accent)}
+  .data-table td{padding:9px 10px;border-bottom:1px solid var(--border);color:var(--text2)}
+  .data-table tr:last-child td{border-bottom:none}
+  .data-table tr:hover td{background:var(--bg3);color:var(--text)}
+  .badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:10px;font-weight:600}
+  .badge-open{background:rgba(247,95,95,.15);color:var(--red)}
+  .badge-closed{background:rgba(34,211,165,.15);color:var(--green)}
+  .badge-pending{background:rgba(247,195,79,.15);color:var(--yellow)}
+  
+  /* DEEP ANALYSIS */
+  .analysis-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px}
+  .analysis-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
+  .analysis-card-title{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:.7px;text-transform:uppercase;margin-bottom:10px}
+  .rank-list{display:flex;flex-direction:column;gap:7px}
+  .rank-item{display:flex;align-items:center;gap:8px}
+  .rank-num{font-size:10px;font-weight:700;color:var(--text3);min-width:16px}
+  .rank-bar-wrap{flex:1;height:6px;background:var(--bg3);border-radius:3px;overflow:hidden}
+  .rank-bar{height:100%;border-radius:3px;background:var(--accent);transition:width .5s}
+  .rank-name{font-size:11px;color:var(--text2);min-width:60px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:90px}
+  .rank-count{font-size:11px;font-weight:600;color:var(--text);min-width:28px;text-align:right}
+  
+  /* UPLOAD OVERLAY */
+  .upload-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:200;align-items:center;justify-content:center}
+  .upload-overlay.show{display:flex}
+  .upload-box{background:var(--bg2);border:1px solid var(--border2);border-radius:14px;padding:32px;width:420px;text-align:center}
+  .upload-icon{font-size:40px;color:var(--accent);margin-bottom:12px}
+  .upload-box h3{font-size:16px;margin-bottom:6px}
+  .upload-box p{font-size:12px;color:var(--text2);margin-bottom:20px}
+  .file-drop{border:2px dashed var(--border2);border-radius:var(--radius);padding:24px;margin-bottom:16px;cursor:pointer;transition:border-color .2s}
+  .file-drop:hover,.file-drop.dragover{border-color:var(--accent)}
+  .file-drop-text{font-size:12px;color:var(--text2)}
+  .upload-close{background:transparent;border:1px solid var(--border);color:var(--text2);padding:7px 20px;border-radius:var(--radius-sm);cursor:pointer;font-size:12px}
+  .upload-close:hover{border-color:var(--accent);color:var(--accent)}
+  
+  /* EMPTY STATE */
+  .empty-state{text-align:center;padding:40px;color:var(--text3)}
+  .empty-state i{font-size:36px;margin-bottom:10px;display:block}
+  .empty-state p{font-size:13px}
+  
+  /* SECTION HEADER */
+  .section-header{display:flex;align-items:center;gap:8px;margin-bottom:0}
+  .section-label{font-size:11px;font-weight:700;color:var(--text3);letter-spacing:1px;text-transform:uppercase}
+  .section-line{flex:1;height:1px;background:var(--border)}
+  
+  /* PAGINATION */
+  .pagination{display:flex;align-items:center;gap:6px;margin-top:12px;justify-content:flex-end}
+  .page-btn{padding:4px 10px;border:1px solid var(--border);border-radius:var(--radius-sm);background:transparent;color:var(--text2);font-size:11px;cursor:pointer}
+  .page-btn.active,.page-btn:hover{background:var(--accent);border-color:var(--accent);color:#fff}
+  .page-info{font-size:11px;color:var(--text3)}
+  
+  /* RESPONSIVE */
+  @media(max-width:600px){.slicers-row{gap:6px}.slicer-group{min-width:100px}.kpi-grid{grid-template-columns:1fr 1fr}.charts-row{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+
+<!-- TOP NAR -->
+<div class="topbar">
+  <div class="topbar-left">
+    <i class="ti ti-layout-dashboard" style="font-size:20px;color:var(--accent)"></i>
+    <span class="topbar-brand">Grievance Analytics Dashboard</span>
+    <span class="topbar-badge" id="recordBadge">0 Records</span>
+  </div>
+  <div class="topbar-right">
+    <span class="last-updated" id="lastUpdated">No data loaded</span>
+    <button class="upload-btn" onclick="document.getElementById('uploadOverlay').classList.add('show')">
+      <i class="ti ti-upload"></i> Upload Excel
+    </button>
+  </div>
+</div>
+
+<!-- UPLOAD OVERLAY -->
+<div class="upload-overlay" id="uploadOverlay">
+  <div class="upload-box">
+    <div class="upload-icon"><i class="ti ti-file-spreadsheet"></i></div>
+    <h3>Upload Grievance Data</h3>
+    <p>Upload an Excel file (.xlsx / .xls / .csv) with the grievance dataset</p>
+    <div class="file-drop" id="fileDrop" onclick="document.getElementById('fileInput').click()">
+      <i class="ti ti-cloud-upload" style="font-size:28px;color:var(--accent);display:block;margin-bottom:8px"></i>
+      <div class="file-drop-text">Click to browse or drag & drop your file here</div>
+      <div style="font-size:11px;color:var(--text3);margin-top:4px">Supports .xlsx, .xls, .csv</div>
+    </div>
+    <input type="file" id="fileInput" accept=".xlsx,.xls,.csv" style="display:none" onchange="handleFile(this)"/>
+    <button class="upload-close" onclick="document.getElementById('uploadOverlay').classList.remove('show')">Cancel</button>
+  </div>
+</div>
+
+<div class="main">
+
+  <!-- SLICERS -->
+  <div class="slicers-panel">
+    <div class="slicers-header">
+      <span class="slicers-title"><i class="ti ti-filter" style="font-size:12px;margin-right:4px"></i>Mandatory Multidimensional In-Memory Slicers</span>
+      <button class="clear-filters-btn" onclick="clearAllFilters()"><i class="ti ti-x" style="font-size:12px"></i> Clear Active Cross-Filters</button>
+    </div>
+    <div class="slicers-row">
+      <div class="slicer-group"><div class="slicer-label">Circle</div><select class="slicer-select" id="sl-circle" onchange="applyFilters()"><option value="">All CIRCLEs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Substation</div><select class="slicer-select" id="sl-substation" onchange="applyFilters()"><option value="">All SUBSTATIONs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Section</div><select class="slicer-select" id="sl-section" onchange="applyFilters()"><option value="">All SECTIONs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Feeder</div><select class="slicer-select" id="sl-feeder" onchange="applyFilters()"><option value="">All FEEDERs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Structure</div><select class="slicer-select" id="sl-structure" onchange="applyFilters()"><option value="">All STRUCTUREs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Type</div><select class="slicer-select" id="sl-type" onchange="applyFilters()"><option value="">All GRIEVANCE TYPEs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Reason</div><select class="slicer-select" id="sl-reason" onchange="applyFilters()"><option value="">All REASONs</option></select></div>
+      <div class="slicer-group"><div class="slicer-label">Source</div><select class="slicer-select" id="sl-source" onchange="applyFilters()"><option value="">All SOURCEs</option></select></div>
+    </div>
+  </div>
+
+  <!-- TIMELINE -->
+  <div class="timeline-panel">
+    <div class="timeline-header">
+      <span class="timeline-title"><i class="ti ti-calendar-event" style="font-size:12px;margin-right:4px"></i>Timeline Filter</span>
+      <div class="timeline-controls">
+        <button class="timeline-btn active" onclick="setTimeline('all',this)">All Time</button>
+        <button class="timeline-btn" onclick="setTimeline('7d',this)">7 Days</button>
+        <button class="timeline-btn" onclick="setTimeline('30d',this)">30 Days</button>
+        <button class="timeline-btn" onclick="setTimeline('90d',this)">90 Days</button>
+        <button class="timeline-btn" onclick="setTimeline('6m',this)">6 Months</button>
+        <button class="timeline-btn" onclick="setTimeline('1y',this)">1 Year</button>
+        <div class="date-range">
+          <input type="date" class="date-input" id="dateFrom" onchange="applyFilters()"/>
+          <span style="color:var(--text3);font-size:11px">to</span>
+          <input type="date" class="date-input" id="dateTo" onchange="applyFilters()"/>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- KPIs -->
+  <div class="section-header"><span class="section-label">Key Performance Indicators</span><div class="section-line"></div></div>
+  <div class="kpi-grid">
+    <div class="kpi-card" style="--kpi-color:var(--blue)">
+      <div class="kpi-icon"><i class="ti ti-map-pin" aria-hidden="true"></i></div>
+      <div class="kpi-label">Circle-wise Grievances</div>
+      <div class="kpi-value" id="kpiCircle">0</div>
+      <div class="kpi-sub" id="kpiCircleSub">Across 0 circles</div>
+      <div class="kpi-trend trend-up" id="kpiCircleTrend"></div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--purple)">
+      <div class="kpi-icon"><i class="ti ti-bolt" aria-hidden="true"></i></div>
+      <div class="kpi-label">Feeder-wise Grievances</div>
+      <div class="kpi-value" id="kpiFeeder">0</div>
+      <div class="kpi-sub" id="kpiFeederSub">Across 0 feeders</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--green)">
+      <div class="kpi-icon"><i class="ti ti-building-factory" aria-hidden="true"></i></div>
+      <div class="kpi-label">Structure-wise Grievances</div>
+      <div class="kpi-value" id="kpiStructure">0</div>
+      <div class="kpi-sub" id="kpiStructureSub">Across 0 structures</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--yellow)">
+      <div class="kpi-icon"><i class="ti ti-topology-star" aria-hidden="true"></i></div>
+      <div class="kpi-label">Section-wise Grievances</div>
+      <div class="kpi-value" id="kpiSection">0</div>
+      <div class="kpi-sub" id="kpiSectionSub">Across 0 sections</div>
+    </div>
+    <div class="kpi-card" style="--kpi-color:var(--red)">
+      <div class="kpi-icon"><i class="ti ti-file-alert" aria-hidden="true"></i></div>
+      <div class="kpi-label">Total Grievances</div>
+      <div class="kpi-value" id="kpiTotal">0</div>
+      <div class="kpi-sub" id="kpiTotalSub">All filtered records</div>
+    </div>
+  </div>
+
+  <!-- CHARTS ROW 1 -->
+  <div class="section-header"><span class="section-label">Visual Analytics</span><div class="section-line"></div></div>
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Grievances Over Time</div>
+      <div class="chart-subtitle">Monthly trend of registered grievances</div>
+      <div class="chart-container" style="height:220px"><canvas id="chartTimeline" role="img" aria-label="Grievances over time line chart">Grievance trend data.</canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Grievance Type Distribution</div>
+      <div class="chart-subtitle">Breakdown by grievance type</div>
+      <div style="display:flex;align-items:center;gap:16px">
+        <div class="chart-container" style="height:220px;width:220px;flex-shrink:0"><canvas id="chartType" role="img" aria-label="Donut chart of grievance types">Type distribution data.</canvas></div>
+        <div id="typeLegend" style="display:flex;flex-direction:column;gap:6px;font-size:11px"></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card">
+      <div class="chart-title">Top 10 Circles by Grievances</div>
+      <div class="chart-subtitle">Horizontal bar comparison across circles</div>
+      <div class="chart-container" id="chartCircleWrap" style="height:260px"><canvas id="chartCircle" role="img" aria-label="Bar chart of circles">Circle data.</canvas></div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-title">Source-wise Grievance Analysis</div>
+      <div class="chart-subtitle">Where grievances are being registered from</div>
+      <div class="chart-container" style="height:260px"><canvas id="chartSource" role="img" aria-label="Bar chart of sources">Source data.</canvas></div>
+    </div>
+  </div>
+
+  <div class="charts-row">
+    <div class="chart-card" style="grid-column:1/-1">
+      <div class="chart-title">Feeder vs Grievance Count — Pareto View</div>
+      <div class="chart-subtitle">Top feeders driving the highest complaint volumes (combined bar + cumulative line)</div>
+      <div class="chart-container" style="height:240px"><canvas id="chartPareto" role="img" aria-label="Pareto chart of feeders">Feeder data.</canvas></div>
+    </div>
+  </div>
+
+  <!-- DEEP ANALYSIS -->
+  <div class="section-header"><span class="section-label">Deep Analysis</span><div class="section-line"></div></div>
+  <div class="analysis-grid">
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-map-pin" style="font-size:11px;margin-right:4px"></i>Top Circles</div>
+      <div class="rank-list" id="rankCircle"></div>
+    </div>
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-bolt" style="font-size:11px;margin-right:4px"></i>Top Feeders</div>
+      <div class="rank-list" id="rankFeeder"></div>
+    </div>
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-building-factory" style="font-size:11px;margin-right:4px"></i>Top Structures</div>
+      <div class="rank-list" id="rankStructure"></div>
+    </div>
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-topology-star" style="font-size:11px;margin-right:4px"></i>Top Sections</div>
+      <div class="rank-list" id="rankSection"></div>
+    </div>
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-alert-circle" style="font-size:11px;margin-right:4px"></i>Top Reasons</div>
+      <div class="rank-list" id="rankReason"></div>
+    </div>
+    <div class="analysis-card">
+      <div class="analysis-card-title"><i class="ti ti-list-details" style="font-size:11px;margin-right:4px"></i>Summary Stats</div>
+      <div id="summaryStats" style="font-size:11px;color:var(--text2);display:flex;flex-direction:column;gap:8px"></div>
+    </div>
+  </div>
+
+  <!-- DATA TABLE -->
+  <div class="section-header"><span class="section-label">Data Records</span><div class="section-line"></div></div>
+  <div class="table-card">
+    <div class="table-header">
+      <span class="table-title">Grievance Records</span>
+      <input class="table-search" type="text" placeholder="Search records..." id="tableSearch" oninput="filterTable()"/>
+    </div>
+    <div style="overflow-x:auto">
+      <table class="data-table" id="dataTable">
+        <thead>
+          <tr>
+            <th onclick="sortTable('SL. NO.')">SL.NO <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('GRIEVANCE ID')">Grievance ID <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('CIRCLE')">Circle <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('SUBSTATION')">Substation <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('SECTION')">Section <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('FEEDER')">Feeder <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('STRUCTURE')">Structure <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('GRIEVANCE TYPE')">Type <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('REASON')">Reason <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('REGISTERED ON')">Registered On <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+            <th onclick="sortTable('SOURCE')">Source <i class="ti ti-chevrons-up-down" style="font-size:10px"></i></th>
+          </tr>
+        </thead>
+        <tbody id="tableBody">
+          <tr><td colspan="11" class="empty-state"><i class="ti ti-table-off"></i><p>Upload an Excel file to view records</p></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-top:10px">
+      <span class="page-info" id="pageInfo">0 records</span>
+      <div class="pagination" id="pagination"></div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// ===================== STATE =====================
+let rawData = [];
+let filteredData = [];
+let tableSearchQuery = '';
+let sortCol = '';
+let sortDir = 1;
+let currentPage = 1;
+const PAGE_SIZE = 25;
+let timelineFilter = 'all';
+let charts = {};
+
+const COLORS = ['#4f8ef7','#7c5cfc','#22d3a5','#f7a14f','#f75f5f','#f7c34f','#5cf7d0','#c45cf7','#f75fc4','#7cf75c'];
+
+// ===================== FILE HANDLING =====================
+function handleFile(input) {
+  const file = input.files[0];
+  if (!file) return;
+  document.getElementById('uploadOverlay').classList.remove('show');
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const wb = XLSX.read(e.target.result, {type:'binary', cellDates:true});
+      const ws = wb.Sheets[wb.SheetNames[0]];
+      let json = XLSX.utils.sheet_to_json(ws, {defval:''});
+      // Normalize column names
+      json = json.map(row => {
+        const norm = {};
+        Object.keys(row).forEach(k => { norm[k.trim().toUpperCase().replace(/\s+/g,' ')] = row[k]; });
+        return norm;
+      });
+      rawData = json;
+      initDashboard();
+    } catch(err) {
+      alert('Error reading file: ' + err.message);
+    }
+  };
+  reader.readAsBinaryString(file);
+}
+
+// Drag and drop
+const fileDrop = document.getElementById('fileDrop');
+fileDrop.addEventListener('dragover', e => { e.preventDefault(); fileDrop.classList.add('dragover'); });
+fileDrop.addEventListener('dragleave', () => fileDrop.classList.remove('dragover'));
+fileDrop.addEventListener('drop', e => {
+  e.preventDefault(); fileDrop.classList.remove('dragover');
+  const dt = new DataTransfer();
+  dt.items.add(e.dataTransfer.files[0]);
+  document.getElementById('fileInput').files = dt.files;
+  handleFile(document.getElementById('fileInput'));
+});
+
+// ===================== INIT =====================
+function initDashboard() {
+  document.getElementById('recordBadge').textContent = rawData.length + ' Records';
+  document.getElementById('lastUpdated').textContent = 'Updated: ' + new Date().toLocaleString();
+  populateSlicers();
+  applyFilters();
+}
+
+// ===================== SLICERS =====================
+function getCol(row, ...keys) {
+  for (const k of keys) {
+    if (row[k] !== undefined && row[k] !== '') return String(row[k]).trim();
+  }
+  return '';
+}
+
+function populateSlicers() {
+  const maps = {
+    'sl-circle': r => getCol(r,'CIRCLE'),
+    'sl-substation': r => getCol(r,'SUBSTATION'),
+    'sl-section': r => getCol(r,'SECTION'),
+    'sl-feeder': r => getCol(r,'FEEDER'),
+    'sl-structure': r => getCol(r,'STRUCTURE'),
+    'sl-type': r => getCol(r,'GRIEVANCE TYPE','TYPE'),
+    'sl-reason': r => getCol(r,'REASON'),
+    'sl-source': r => getCol(r,'SOURCE')
+  };
+  Object.entries(maps).forEach(([id, fn]) => {
+    const sel = document.getElementById(id);
+    const first = sel.options[0];
+    sel.innerHTML = '';
+    sel.appendChild(first);
+    [...new Set(rawData.map(fn).filter(Boolean))].sort().forEach(v => {
+      const o = new Option(v,v); sel.appendChild(o);
+    });
+  });
+}
+
+function getSlicerVal(id) { return document.getElementById(id).value; }
+
+function clearAllFilters() {
+  ['sl-circle','sl-substation','sl-section','sl-feeder','sl-structure','sl-type','sl-reason','sl-source'].forEach(id => document.getElementById(id).value = '');
+  document.getElementById('dateFrom').value = '';
+  document.getElementById('dateTo').value = '';
+  setTimeline('all', document.querySelector('.timeline-btn'));
+  applyFilters();
+}
+
+// ===================== TIMELINE =====================
+function setTimeline(period, btn) {
+  document.querySelectorAll('.timeline-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  timelineFilter = period;
+  const now = new Date();
+  let from = null;
+  if (period === '7d') from = new Date(now - 7*864e5);
+  else if (period === '30d') from = new Date(now - 30*864e5);
+  else if (period === '90d') from = new Date(now - 90*864e5);
+  else if (period === '6m') from = new Date(now.getFullYear(), now.getMonth()-6, now.getDate());
+  else if (period === '1y') from = new Date(now.getFullYear()-1, now.getMonth(), now.getDate());
+  if (from) {
+    document.getElementById('dateFrom').value = from.toISOString().split('T')[0];
+    document.getElementById('dateTo').value = now.toISOString().split('T')[0];
+  } else {
+    document.getElementById('dateFrom').value = '';
+    document.getElementById('dateTo').value = '';
+  }
+  applyFilters();
+}
+
+// ===================== FILTER =====================
+function parseDate(v) {
+  if (!v) return null;
+  if (v instanceof Date) return isNaN(v)?null:v;
+  const d = new Date(v);
+  return isNaN(d) ? null : d;
+}
+
+function applyFilters() {
+  const circle = getSlicerVal('sl-circle');
+  const substation = getSlicerVal('sl-substation');
+  const section = getSlicerVal('sl-section');
+  const feeder = getSlicerVal('sl-feeder');
+  const structure = getSlicerVal('sl-structure');
+  const type = getSlicerVal('sl-type');
+  const reason = getSlicerVal('sl-reason');
+  const source = getSlicerVal('sl-source');
+  const dateFrom = document.getElementById('dateFrom').value ? new Date(document.getElementById('dateFrom').value) : null;
+  const dateTo = document.getElementById('dateTo').value ? new Date(document.getElementById('dateTo').value + 'T23:59:59') : null;
+
+  filteredData = rawData.filter(r => {
+    if (circle && getCol(r,'CIRCLE') !== circle) return false;
+    if (substation && getCol(r,'SUBSTATION') !== substation) return false;
+    if (section && getCol(r,'SECTION') !== section) return false;
+    if (feeder && getCol(r,'FEEDER') !== feeder) return false;
+    if (structure && getCol(r,'STRUCTURE') !== structure) return false;
+    if (type && getCol(r,'GRIEVANCE TYPE','TYPE') !== type) return false;
+    if (reason && getCol(r,'REASON') !== reason) return false;
+    if (source && getCol(r,'SOURCE') !== source) return false;
+    if (dateFrom || dateTo) {
+      const d = parseDate(r['REGISTERED ON']);
+      if (!d) return false;
+      if (dateFrom && d < dateFrom) return false;
+      if (dateTo && d > dateTo) return false;
+    }
+    return true;
+  });
+
+  updateKPIs();
+  renderCharts();
+  renderAnalysis();
+  renderTable();
+}
+
+// ===================== KPIs =====================
+function countUnique(field) {
+  return new Set(filteredData.map(r => getCol(r, field)).filter(Boolean)).size;
+}
+function updateKPIs() {
+  const n = filteredData.length;
+  const circles = countUnique('CIRCLE');
+  const feeders = countUnique('FEEDER');
+  const structs = countUnique('STRUCTURE');
+  const subs = countUnique('SUBSTATION');
+  const sections = countUnique('SECTION');
+
+  document.getElementById('kpiTotal').textContent = n.toLocaleString();
+  document.getElementById('kpiTotalSub').textContent = 'Filtered records';
+  document.getElementById('kpiCircle').textContent = n.toLocaleString();
+  document.getElementById('kpiCircleSub').textContent = 'Across ' + circles + ' circle' + (circles!==1?'s':'');
+  document.getElementById('kpiFeeder').textContent = n.toLocaleString();
+  document.getElementById('kpiFeederSub').textContent = 'Across ' + feeders + ' feeder' + (feeders!==1?'s':'');
+  document.getElementById('kpiStructure').textContent = n.toLocaleString();
+  document.getElementById('kpiStructureSub').textContent = 'Across ' + structs + ' structure' + (structs!==1?'s':'');
+  document.getElementById('kpiSection').textContent = n.toLocaleString();
+  document.getElementById('kpiSectionSub').textContent = 'Across ' + sections + ' section' + (sections!==1?'s':'');
+}
+
+// ===================== CHARTS =====================
+function freq(data, field) {
+  const m = {};
+  data.forEach(r => { const v = getCol(r, field)||'Unknown'; m[v] = (m[v]||0)+1; });
+  return Object.entries(m).sort((a,b)=>b[1]-a[1]);
+}
+
+function mkChart(id, cfg) {
+  if (charts[id]) charts[id].destroy();
+  charts[id] = new Chart(document.getElementById(id), cfg);
+}
+
+function renderCharts() {
+  if (!filteredData.length) {
+    ['chartTimeline','chartType','chartCircle','chartSource','chartPareto'].forEach(id => {
+      if (charts[id]) { charts[id].destroy(); delete charts[id]; }
+    });
+    return;
+  }
+
+  // 1. Timeline chart
+  const byMonth = {};
+  filteredData.forEach(r => {
+    const d = parseDate(r['REGISTERED ON']);
+    if (!d) return;
+    const key = d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0');
+    byMonth[key] = (byMonth[key]||0)+1;
+  });
+  const sortedMonths = Object.keys(byMonth).sort();
+  mkChart('chartTimeline', {
+    type: 'line',
+    data: {
+      labels: sortedMonths.map(m => { const [y,mo]=m.split('-'); return ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)-1]+' '+y.slice(2); }),
+      datasets: [{
+        label: 'Grievances',
+        data: sortedMonths.map(m=>byMonth[m]),
+        borderColor: '#4f8ef7',
+        backgroundColor: 'rgba(79,142,247,0.12)',
+        fill: true,
+        tension: 0.4,
+        pointBackgroundColor: '#4f8ef7',
+        pointRadius: 3
+      }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9aa3bf', font: { size: 10 }, maxRotation: 45 } },
+        y: { grid: { color: 'rgba(255,255,255,0.05)' }, ticks: { color: '#9aa3bf', font: { size: 10 } } }
+      }
+    }
+  });
+
+  // 2. Donut chart - Type
+  const typeFreq = freq(filteredData, 'GRIEVANCE TYPE').slice(0,8);
+  const legend = document.getElementById('typeLegend');
+  legend.innerHTML = '';
+  typeFreq.forEach(([label,count],i) => {
+    const pct = Math.round(count/filteredData.length*100);
+    legend.innerHTML += `<div style="display:flex;align-items:center;gap:5px"><span style="width:10px;height:10px;border-radius:2px;background:${COLORS[i%COLORS.length]};flex-shrink:0"></span><span style="color:var(--text2);flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${label}</span><span style="color:var(--text);font-weight:600">${pct}%</span></div>`;
+  });
+  mkChart('chartType', {
+    type: 'doughnut',
+    data: {
+      labels: typeFreq.map(e=>e[0]),
+      datasets: [{ data: typeFreq.map(e=>e[1]), backgroundColor: COLORS.slice(0,typeFreq.length), borderWidth: 0, hoverOffset: 6 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false, cutout: '65%',
+      plugins: { legend: { display: false }, tooltip: { callbacks: { label: ctx => ` ${ctx.label}: ${ctx.raw} (${Math.round(ctx.raw/filteredData.length*100)}%)` } } }
+    }
+  });
+
+  // 3. Circle horizontal bar
+  const circleFreq = freq(filteredData, 'CIRCLE').slice(0,10);
+  const cwrap = document.getElementById('chartCircleWrap');
+  cwrap.style.height = Math.max(220, circleFreq.length * 36 + 60) + 'px';
+  mkChart('chartCircle', {
+    type: 'bar',
+    data: {
+      labels: circleFreq.map(e=>e[0]),
+      datasets: [{ label:'Grievances', data: circleFreq.map(e=>e[1]), backgroundColor: COLORS[0], borderRadius: 4 }]
+    },
+    options: {
+      indexAxis: 'y', responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#9aa3bf', font:{size:10} } },
+        y: { grid: { display:false }, ticks: { color:'#9aa3bf', font:{size:11} } }
+      }
+    }
+  });
+
+  // 4. Source bar
+  const srcFreq = freq(filteredData, 'SOURCE').slice(0,10);
+  mkChart('chartSource', {
+    type: 'bar',
+    data: {
+      labels: srcFreq.map(e=>e[0]),
+      datasets: [{ label:'Count', data: srcFreq.map(e=>e[1]), backgroundColor: srcFreq.map((_,i)=>COLORS[i%COLORS.length]), borderRadius: 4 }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid: { display:false }, ticks: { color:'#9aa3bf', font:{size:10}, maxRotation:45 } },
+        y: { grid: { color:'rgba(255,255,255,0.05)' }, ticks: { color:'#9aa3bf', font:{size:10} } }
+      }
+    }
+  });
+
+  // 5. Pareto (Feeder)
+  const feederFreq = freq(filteredData, 'FEEDER').slice(0,15);
+  const total = feederFreq.reduce((s,e)=>s+e[1],0);
+  let cum = 0;
+  const cumPct = feederFreq.map(e => { cum += e[1]; return Math.round(cum/total*100); });
+  mkChart('chartPareto', {
+    type: 'bar',
+    data: {
+      labels: feederFreq.map(e=>e[0]),
+      datasets: [
+        { type:'bar', label:'Grievances', data: feederFreq.map(e=>e[1]), backgroundColor:'#7c5cfc', borderRadius:4, yAxisID:'y' },
+        { type:'line', label:'Cumulative %', data: cumPct, borderColor:'#f7a14f', backgroundColor:'transparent', pointBackgroundColor:'#f7a14f', pointRadius:3, tension:0.2, yAxisID:'y2' }
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: false,
+      plugins: { legend: { display: false } },
+      scales: {
+        x: { grid:{display:false}, ticks:{color:'#9aa3bf',font:{size:10},maxRotation:45} },
+        y: { grid:{color:'rgba(255,255,255,0.05)'}, ticks:{color:'#9aa3bf',font:{size:10}}, position:'left' },
+        y2: { position:'right', min:0, max:100, ticks:{color:'#f7a14f',font:{size:10},callback:v=>v+'%'}, grid:{display:false} }
+      }
+    }
+  });
+}
+
+// ===================== ANALYSIS =====================
+function renderRankList(id, data, color) {
+  const el = document.getElementById(id);
+  if (!data.length) { el.innerHTML = '<div style="color:var(--text3);font-size:11px">No data</div>'; return; }
+  const max = data[0][1];
+  el.innerHTML = data.slice(0,7).map(([name,cnt],i) =>
+    `<div class="rank-item">
+      <span class="rank-num">${i+1}</span>
+      <span class="rank-name" title="${name}">${name}</span>
+      <div class="rank-bar-wrap"><div class="rank-bar" style="width:${Math.round(cnt/max*100)}%;background:${color}"></div></div>
+      <span class="rank-count">${cnt.toLocaleString()}</span>
+    </div>`
+  ).join('');
+}
+
+function renderAnalysis() {
+  renderRankList('rankCircle', freq(filteredData,'CIRCLE'), '#4f8ef7');
+  renderRankList('rankFeeder', freq(filteredData,'FEEDER'), '#7c5cfc');
+  renderRankList('rankStructure', freq(filteredData,'STRUCTURE'), '#22d3a5');
+  renderRankList('rankSection', freq(filteredData,'SECTION'), '#f7a14f');
+  renderRankList('rankReason', freq(filteredData,'REASON'), '#f75f5f');
+
+  const ss = document.getElementById('summaryStats');
+  const n = filteredData.length;
+  if (!n) { ss.innerHTML = '<div style="color:var(--text3)">No data loaded</div>'; return; }
+  const sections = countUnique('SECTION');
+  const sources = countUnique('SOURCE');
+  const types = countUnique('GRIEVANCE TYPE');
+  const reasons = countUnique('REASON');
+  const byMonth = {};
+  filteredData.forEach(r => { const d=parseDate(r['REGISTERED ON']); if(!d)return; const k=d.getFullYear()+'-'+d.getMonth(); byMonth[k]=(byMonth[k]||0)+1; });
+  const monthCounts = Object.values(byMonth);
+  const avgPerMonth = monthCounts.length ? Math.round(monthCounts.reduce((a,b)=>a+b,0)/monthCounts.length) : 0;
+  const peakMonth = monthCounts.length ? Math.max(...monthCounts) : 0;
+  ss.innerHTML = [
+    ['Total records', n.toLocaleString()],
+    ['Unique circles', countUnique('CIRCLE')],
+    ['Unique feeders', countUnique('FEEDER')],
+    ['Unique substations', countUnique('SUBSTATION')],
+    ['Unique structures', countUnique('STRUCTURE')],
+    ['Unique sections', sections],
+    ['Grievance types', types],
+    ['Unique reasons', reasons],
+    ['Sources', sources],
+    ['Avg/month', avgPerMonth],
+    ['Peak month', peakMonth]
+  ].map(([label,val]) =>
+    `<div style="display:flex;justify-content:space-between;border-bottom:1px solid var(--border);padding-bottom:5px">
+      <span style="color:var(--text3)">${label}</span>
+      <span style="color:var(--text);font-weight:600">${val}</span>
+    </div>`
+  ).join('');
+}
+
+// ===================== TABLE =====================
+let tableData = [];
+function renderTable() {
+  tableData = [...filteredData];
+  if (tableSearchQuery) {
+    const q = tableSearchQuery.toLowerCase();
+    tableData = tableData.filter(r => Object.values(r).some(v => String(v).toLowerCase().includes(q)));
+  }
+  if (sortCol) {
+    tableData.sort((a,b) => {
+      const av = String(a[sortCol]||'').toLowerCase();
+      const bv = String(b[sortCol]||'').toLowerCase();
+      return av < bv ? -sortDir : av > bv ? sortDir : 0;
+    });
+  }
+  currentPage = 1;
+  renderPage();
+}
+
+function renderPage() {
+  const start = (currentPage-1)*PAGE_SIZE;
+  const page = tableData.slice(start, start+PAGE_SIZE);
+  const tbody = document.getElementById('tableBody');
+  if (!tableData.length) {
+    tbody.innerHTML = '<tr><td colspan="11" class="empty-state"><i class="ti ti-table-off" style="font-size:28px;display:block;margin-bottom:8px"></i><p>No records match your filters</p></td></tr>';
+  } else {
+    tbody.innerHTML = page.map(r => {
+      const dt = parseDate(r['REGISTERED ON']);
+      const dtStr = dt ? dt.toLocaleDateString('en-IN') : (r['REGISTERED ON']||'');
+      return `<tr>
+        <td>${r['SL. NO.']||r['SL.NO']||r['SLNO']||''}</td>
+        <td style="color:var(--accent)">${r['GRIEVANCE ID']||''}</td>
+        <td>${getCol(r,'CIRCLE')}</td>
+        <td>${getCol(r,'SUBSTATION')}</td>
+        <td>${getCol(r,'SECTION')}</td>
+        <td>${getCol(r,'FEEDER')}</td>
+        <td>${getCol(r,'STRUCTURE')}</td>
+        <td>${getCol(r,'GRIEVANCE TYPE','TYPE')}</td>
+        <td>${getCol(r,'REASON')}</td>
+        <td>${dtStr}</td>
+        <td>${getCol(r,'SOURCE')}</td>
+      </tr>`;
+    }).join('');
+  }
+  document.getElementById('pageInfo').textContent = tableData.length.toLocaleString() + ' record' + (tableData.length!==1?'s':'') + (filteredData.length!==tableData.length?' (filtered)':'');
+  renderPagination();
+}
+
+function renderPagination() {
+  const totalPages = Math.ceil(tableData.length/PAGE_SIZE);
+  const pg = document.getElementById('pagination');
+  if (totalPages <= 1) { pg.innerHTML=''; return; }
+  let html = `<button class="page-btn" onclick="goPage(${Math.max(1,currentPage-1)})" ${currentPage===1?'disabled':''}>‹</button>`;
+  for (let i=Math.max(1,currentPage-2); i<=Math.min(totalPages,currentPage+2); i++) {
+    html += `<button class="page-btn ${i===currentPage?'active':''}" onclick="goPage(${i})">${i}</button>`;
+  }
+  html += `<button class="page-btn" onclick="goPage(${Math.min(totalPages,currentPage+1)})" ${currentPage===totalPages?'disabled':''}>›</button>`;
+  pg.innerHTML = html;
+}
+
+function goPage(p) { currentPage=p; renderPage(); }
+
+function filterTable() {
+  tableSearchQuery = document.getElementById('tableSearch').value;
+  renderTable();
+}
+
+function sortTable(col) {
+  if (sortCol===col) sortDir*=-1; else { sortCol=col; sortDir=1; }
+  renderTable();
+}
+
+// ===================== SAMPLE DATA =====================
+function loadSampleData() {
+  const circles = ['North Circle','South Circle','East Circle','West Circle','Central Circle'];
+  const substations = ['SS-Hyderabad','SS-Secunderabad','SS-Warangal','SS-Karimnagar','SS-Nizamabad','SS-Khammam'];
+  const sections = ['Section A','Section B','Section C','Section D'];
+  const feeders = ['F-101','F-102','F-103','F-201','F-202','F-301','F-302','F-303'];
+  const structures = ['11KV Line','33KV Line','Distribution Box','Pole','Transformer'];
+  const types = ['Power Failure','Low Voltage','High Voltage','Meter Issue','Billing Issue','Pole Damage'];
+  const reasons = ['Cable Fault','Equipment Failure','Overload','Weather Damage','Old Infrastructure','Illegal Connection'];
+  const sources = ['Online Portal','Call Center','Field Visit','SMS','Mobile App'];
+  const sample = [];
+  for (let i=1; i<=200; i++) {
+    const d = new Date(2024,Math.floor(Math.random()*12),Math.floor(Math.random()*28)+1);
+    sample.push({
+      'SL. NO.': i,
+      'GRIEVANCE ID': 'GRV-' + String(i).padStart(5,'0'),
+      'UKSCNO': 'UKSC' + (1000+i),
+      'CIRCLE': circles[Math.floor(Math.random()*circles.length)],
+      'SUBSTATION': substations[Math.floor(Math.random()*substations.length)],
+      'SECTION': sections[Math.floor(Math.random()*sections.length)],
+      'FEEDER': feeders[Math.floor(Math.random()*feeders.length)],
+      'STRUCTURE': structures[Math.floor(Math.random()*structures.length)],
+      'GRIEVANCE TYPE': types[Math.floor(Math.random()*types.length)],
+      'REASON': reasons[Math.floor(Math.random()*reasons.length)],
+      'REGISTERED ON': d,
+      'SOURCE': sources[Math.floor(Math.random()*sources.length)]
+    });
+  }
+  rawData = sample;
+  document.getElementById('recordBadge').textContent = '200 Records (Sample)';
+  document.getElementById('lastUpdated').textContent = 'Sample data loaded';
+  initDashboard();
+}
+
+loadSampleData();
+</script>
+</body>
+</html>
